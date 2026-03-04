@@ -1,0 +1,9 @@
+[submodule "chainlink-vwap-fe"]
+	path = chainlink-vwap-fe
+	url = git@github.com:pelith/chainlink-vwap-fe.git
+[submodule "chainlink-vwap-contract-cre"]
+	path = chainlink-vwap-contract-cre
+	url = git@github.com:pelith/chainlink-vwap-contract-cre.git
+[submodule "chainlink-vwap-be"]
+	path = chainlink-vwap-be
+	url = git@github.com:pelith/chainlink-vwap-be.git
