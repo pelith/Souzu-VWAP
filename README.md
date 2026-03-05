@@ -14,6 +14,8 @@ A settlement-grade spot exchange where large trades settle at the **12-hour VWAP
 
 **Live App:** [souzu.netlify.app](https://souzu.netlify.app)
 
+**VTN Explorer:** [dashboard.tenderly.co/explorer/vnet/df8e9af3-8def-4a57-a586-ee45398539cd](https://dashboard.tenderly.co/explorer/vnet/df8e9af3-8def-4a57-a586-ee45398539cd)
+
 ---
 
 ## Why VWAP?
@@ -175,3 +177,83 @@ The CRE workflow code (`workflow.go`) is identical in both modes — only the ex
 | Consensus | None (single result) | OCR — F+1 DON signatures |
 | Oracle contract | `ManualVWAPOracle` | `ChainlinkVWAPAdapter` |
 | Forwarder | `MockKeystoneForwarder` | CRE Forwarder |
+
+---
+
+### Tenderly VTN Demo
+
+**VTN Explorer:** [dashboard.tenderly.co/explorer/vnet/df8e9af3-8def-4a57-a586-ee45398539cd](https://dashboard.tenderly.co/explorer/vnet/df8e9af3-8def-4a57-a586-ee45398539cd)
+
+Testing a 12-hour settlement window on a real testnet would require waiting 12 hours between each step. The VTN demo solves this with two Tenderly-specific JSON-RPC methods:
+
+- **`evm_setNextBlockTimestamp`** — warps the chain's block timestamp to any point in time instantly
+- **`tenderly_setErc20Balance`** — mints test tokens to any address without a faucet
+
+`demo-vtn.sh` uses these to simulate 182 hours of trading activity in seconds, producing all four possible trade states on-chain in a single run. This serves three purposes:
+
+1. **Contract validation** — exercises the full lifecycle (`fill` → oracle price → `settle` / `refund`) in one shot, confirming all contract logic is correct end-to-end
+2. **Frontend testing fixture** — gives UI engineers a ready-made set of orders covering every state, so they can test rendering and interactions without manually crafting edge cases
+3. **Backend re-index resilience** — by recording the block number just before the first `fill`, the backend indexer can be restarted from that point at any time and reconstruct full state, simulating recovery after downtime
+
+#### What the script does
+
+```
+T0+0H    fill A  (startA=T0,    endA=T0+12H)
+T0+1H    fill C  (startC=T0+1H, endC=T0+13H)
+T0+13H   → warp time → CRE simulate(A) → onReport → settle(A) → fill B
+T0+169H  → warp time → fill D
+T0+182H  → warp time → CRE simulate(B) → onReport  [freeze here]
+```
+
+At T0+182H (frozen state):
+
+| Trade | State | Why |
+|-------|-------|-----|
+| A | **Settled** | Oracle price set, `settle()` called at T0+13H |
+| B | **Ready to Settle** | Oracle price set, `settle()` not called, grace not expired |
+| C | **Ready to Refund** | No oracle price, grace period expired 1H ago |
+| D | **Pending** | endTime just passed, no oracle price, grace not expired |
+
+Each oracle price is set by calling `simulate-and-forward.sh`, which runs `cre workflow simulate` against real CEX data and submits the rawReport on-chain — the same CRE workflow code used in production.
+
+#### Running the demo
+
+```bash
+# Requires DEPLOYER_PRIVATE_KEY, TENDERLY_ADMIN_RPC, SPOT_ADDRESS, MANUAL_ORACLE_ADDRESS in .env
+./chainlink-vwap-contract-cre/scripts/demo-vtn.sh
+```
+
+#### Configuring frontend and backend to point at VTN
+
+**Frontend `.env`:**
+
+| Key | Value |
+|-----|-------|
+| `VITE_VWAP_ORACLE_CONTRACT_ADDRESS` | `MANUAL_ORACLE_ADDRESS` |
+| `VITE_VWAP_CONTRACT_ADDRESS` | `SPOT_ADDRESS` |
+| `VITE_TARGET_CHAIN_ID` | VTN chain ID (from Tenderly dashboard) |
+| `VITE_SEPOLIA_RPC_URL` | VTN public RPC URL |
+
+**Backend `.env`:**
+
+| Key | Value |
+|-----|-------|
+| `APP_CONFIG_ETHEREUM_RPC_URL` | VTN public RPC URL |
+| `APP_CONFIG_ETHEREUM_VWAP_RFQ_CONTRACT_ADDR` | `SPOT_ADDRESS` |
+| `APP_CONFIG_ETHEREUM_INDEXER_START_BLOCK` | Block number just before the first `fill` tx |
+
+#### Setting oracle prices manually
+
+```bash
+# Simulate VWAP and write on-chain for a specific time window
+RPC_URL=$TENDERLY_ADMIN_RPC ./chainlink-vwap-contract-cre/scripts/simulate-and-forward.sh "2025-02-27 12:00"
+```
+
+End time is floored to the hour; `startTime = endTime − 12h`. Verify:
+
+```bash
+cast call $MANUAL_ORACLE_ADDRESS \
+  "getPrice(uint256,uint256)(uint256)" \
+  $START_TIME $END_TIME \
+  --rpc-url $TENDERLY_ADMIN_RPC
+```
