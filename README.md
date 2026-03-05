@@ -1,8 +1,10 @@
-# Chainlink VWAP RFQ Spot
+# Souzu VWAP
 
-> **Big trades shouldn't carry execution risk — trade at the market's consensus price.**
+Programmable VWAP settlement for DeFi, powered by Chainlink CRE.
 
 A settlement-grade spot exchange where large trades settle at the **12-hour VWAP price** computed by a decentralized Chainlink CRE DON across five major exchanges.
+
+> **Big trades shouldn't carry execution risk — trade at the market's consensus price.**
 
 ---
 
@@ -43,12 +45,7 @@ Each CRE node independently fetches historical candle data from five CEX APIs an
 1. **Maker** signs an EIP-712 order off-chain (amount, min out, delta bps, deadline) and submits it to the orderbook
 2. **Taker** calls `fill()` — contract verifies the signature, locks WETH + USDC, records `startTime` / `endTime` (+12h)
 3. **Backend** detects the `Filled` event; an **hourly cron job** scans for expired orders and triggers the settler
-4. **CRE Workflow** executes on each DON node independently:
-   - HTTP Trigger fires on-demand — no continuous gas cost
-   - Each node independently fetches 1h OHLCV candles from Binance, OKX, Bybit, Coinbase, Bitget
-   - Each node independently computes VWAP = Σ(quoteVol) / Σ(baseVol)
-   - Four circuit breakers applied: coverage gate (≥3 venues), outlier scrubbing (>2% deviation), staleness check (≤60min from endTime), flash crash guard (<15% VWAP vs last close)
-   - OCR consensus → median selected → signed report
+4. **CRE Workflow** (`chainlink-vwap-contract-cre`) fetches 1h OHLCV candles from five CEXes, computes VWAP, applies circuit breakers, and writes a signed price report on-chain via the Forwarder — same workflow code in both modes (see [MockForwarder vs Production CRE](#mockforwarder-vs-production-cre))
 5. **Forwarder** writes the signed report on-chain via `onReport()`
 6. **Anyone** calls `settle()` — `VWAPRFQSpot` reads oracle price, applies `deltaBps`, distributes funds to maker and taker
 7. If no one settles within the grace period, **anyone** calls `refund()` — both parties reclaim their original deposits
@@ -92,7 +89,8 @@ flowchart TB
 | [`chainlink-vwap-contract-cre/vwap-eth-quote-flow/workflow.go`](./chainlink-vwap-contract-cre/vwap-eth-quote-flow/workflow.go) | Main CRE Workflow: fetches multi-exchange OHLCV, computes 12h VWAP, applies circuit breakers, writes on-chain via OCR |
 | [`chainlink-vwap-contract-cre/vwap-eth-quote-flow/workflow.yaml`](./chainlink-vwap-contract-cre/vwap-eth-quote-flow/workflow.yaml) | CRE CLI workflow config (targets, trigger settings) |
 | [`chainlink-vwap-contract-cre/project.yaml`](./chainlink-vwap-contract-cre/project.yaml) | CRE CLI project settings (RPC, forwarder addresses for Sepolia) |
-| [`chainlink-vwap-contract-cre/cmd/trigger/main.go`](./chainlink-vwap-contract-cre/cmd/trigger/main.go) | Backend trigger: signs and sends HTTP POST to CRE DON endpoint |
+| [`chainlink-vwap-contract-cre/cmd/server/`](./chainlink-vwap-contract-cre/cmd/server/) | Settler microservice: exposes `POST /settle`, runs `cre workflow simulate`, submits rawReport on-chain |
+| [`chainlink-vwap-contract-cre/cmd/trigger/main.go`](./chainlink-vwap-contract-cre/cmd/trigger/main.go) | Production trigger: signs and sends HTTP POST to live CRE DON endpoint |
 
 ### Smart Contracts
 
@@ -164,13 +162,16 @@ cre workflow simulate vwap-eth-quote-flow \
 
 ### MockForwarder vs Production CRE
 
-The current Sepolia deployment routes reports through `MockKeystoneForwarder`, which accepts unsigned reports and calls `onReport()` directly — useful for simulation and demos without a live CRE DON.
+The CRE workflow code (`workflow.go`) is identical in both modes — only the execution environment differs.
 
-In production, `ChainlinkVWAPAdapter` replaces `ManualVWAPOracle` as the receiver. The real CRE Forwarder verifies F+1 DON signatures before calling `onReport()`, providing full decentralized trust guarantees.
+**Current (demo):** Backend hourly cron job triggers the settler microservice (`cmd/server`), which runs `cre workflow simulate` on a single node — fetching real CEX data and computing VWAP the same way — then submits the rawReport to `MockKeystoneForwarder`.
+
+**Production (live CRE DON):** CRE native cron job fires an HTTP Trigger across all DON nodes. Each node independently executes `workflow.go`; OCR consensus selects the median → signed report submitted via the real CRE Forwarder with F+1 signature verification.
 
 | | Demo (current) | Production |
 |-|---------------|------------|
+| Workflow trigger | Backend hourly cron → `cmd/server` | CRE native cron + HTTP Trigger |
+| Execution | Single-node `cre workflow simulate` | All DON nodes independently |
+| Consensus | None (single result) | OCR — F+1 DON signatures |
 | Oracle contract | `ManualVWAPOracle` | `ChainlinkVWAPAdapter` |
 | Forwarder | `MockKeystoneForwarder` | CRE Forwarder |
-| Signature verification | None | F+1 DON signatures |
-| Report source | `simulate-and-forward.sh` | Live CRE DON nodes |
