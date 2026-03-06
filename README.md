@@ -88,20 +88,20 @@ flowchart TB
 
 | File | Description |
 |------|-------------|
-| [`chainlink-vwap-contract-cre/vwap-eth-quote-flow/workflow.go`](./chainlink-vwap-contract-cre/vwap-eth-quote-flow/workflow.go) | Main CRE Workflow: fetches multi-exchange OHLCV, computes 12h VWAP, applies circuit breakers, writes on-chain via OCR |
-| [`chainlink-vwap-contract-cre/vwap-eth-quote-flow/workflow.yaml`](./chainlink-vwap-contract-cre/vwap-eth-quote-flow/workflow.yaml) | CRE CLI workflow config (targets, trigger settings) |
-| [`chainlink-vwap-contract-cre/project.yaml`](./chainlink-vwap-contract-cre/project.yaml) | CRE CLI project settings (RPC, forwarder addresses for Sepolia) |
-| [`chainlink-vwap-contract-cre/cmd/server/`](./chainlink-vwap-contract-cre/cmd/server/) | Settler microservice: exposes `POST /settle`, runs `cre workflow simulate`, submits rawReport on-chain |
-| [`chainlink-vwap-contract-cre/cmd/trigger/main.go`](./chainlink-vwap-contract-cre/cmd/trigger/main.go) | Production trigger: signs and sends HTTP POST to live CRE DON endpoint |
+| [`chainlink-vwap-contract-cre/vwap-eth-quote-flow/workflow.go`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/vwap-eth-quote-flow/workflow.go) | Main CRE Workflow: fetches multi-exchange OHLCV, computes 12h VWAP, applies circuit breakers, writes on-chain via OCR |
+| [`chainlink-vwap-contract-cre/vwap-eth-quote-flow/workflow.yaml`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/vwap-eth-quote-flow/workflow.yaml) | CRE CLI workflow config (targets, trigger settings) |
+| [`chainlink-vwap-contract-cre/project.yaml`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/project.yaml) | CRE CLI project settings (RPC, forwarder addresses for Sepolia) |
+| [`chainlink-vwap-contract-cre/cmd/server/`](https://github.com/pelith/chainlink-vwap-contract-cre/tree/main/cmd/server/) | Settler microservice: exposes `POST /settle`, runs `cre workflow simulate`, submits rawReport on-chain |
+| [`chainlink-vwap-contract-cre/cmd/trigger/main.go`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/cmd/trigger/main.go) | Production trigger: signs and sends HTTP POST to live CRE DON endpoint |
 
 ### Smart Contracts
 
 | File | Description |
 |------|-------------|
-| [`chainlink-vwap-contract-cre/contracts/evm/src/ChainlinkVWAPAdapter.sol`](./chainlink-vwap-contract-cre/contracts/evm/src/ChainlinkVWAPAdapter.sol) | Production oracle — receives signed VWAP reports from CRE Forwarder via `IReceiver` |
-| [`chainlink-vwap-contract-cre/contracts/evm/src/keystone/IReceiver.sol`](./chainlink-vwap-contract-cre/contracts/evm/src/keystone/IReceiver.sol) | Chainlink Keystone `IReceiver` interface |
-| [`chainlink-vwap-contract-cre/contracts/evm/src/VWAPRFQSpot.sol`](./chainlink-vwap-contract-cre/contracts/evm/src/VWAPRFQSpot.sol) | Main exchange contract — reads oracle price on `settle()` |
-| [`chainlink-vwap-contract-cre/contracts/evm/src/ManualVWAPOracle.sol`](./chainlink-vwap-contract-cre/contracts/evm/src/ManualVWAPOracle.sol) | Staging oracle — implements `IReceiver`, used for simulation and demo |
+| [`chainlink-vwap-contract-cre/contracts/evm/src/ChainlinkVWAPAdapter.sol`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/contracts/evm/src/ChainlinkVWAPAdapter.sol) | Production oracle — receives signed VWAP reports from CRE Forwarder via `IReceiver` |
+| [`chainlink-vwap-contract-cre/contracts/evm/src/keystone/IReceiver.sol`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/contracts/evm/src/keystone/IReceiver.sol) | Chainlink Keystone `IReceiver` interface |
+| [`chainlink-vwap-contract-cre/contracts/evm/src/VWAPRFQSpot.sol`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/contracts/evm/src/VWAPRFQSpot.sol) | Main exchange contract — reads oracle price on `settle()` |
+| [`chainlink-vwap-contract-cre/contracts/evm/src/ManualVWAPOracle.sol`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/contracts/evm/src/ManualVWAPOracle.sol) | Staging oracle — implements `IReceiver`, used for simulation and demo |
 
 ---
 
@@ -129,9 +129,9 @@ git submodule update --init --recursive
 
 | Component | Setup Guide |
 |-----------|-------------|
-| CRE Workflow & Contracts | [chainlink-vwap-cre/README.md](./chainlink-vwap-cre/README.md) |
-| Backend | [chainlink-vwap-be/README.md](./chainlink-vwap-be/README.md) |
-| Frontend | [chainlink-vwap-fe/README.md](./chainlink-vwap-fe/README.md) |
+| CRE Workflow & Contracts | [chainlink-vwap-contract-cre/README.md](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/README.md) |
+| Backend | [chainlink-vwap-be/README.md](https://github.com/pelith/chainlink-vwap-be/blob/main/README.md) |
+| Frontend | [chainlink-vwap-fe/README.md](https://github.com/pelith/chainlink-vwap-fe/blob/main/README.md) |
 
 ---
 
@@ -158,9 +158,9 @@ cre workflow simulate vwap-eth-quote-flow \
 
 | Script | Description |
 |--------|-------------|
-| [`scripts/simulate.sh`](./chainlink-vwap-contract-cre/scripts/simulate.sh) | Run CRE simulate with a custom payload |
-| [`scripts/simulate-and-forward.sh`](./chainlink-vwap-contract-cre/scripts/simulate-and-forward.sh) | Simulate + submit rawReport on-chain via MockKeystoneForwarder |
-| [`scripts/demo-vtn.sh`](./chainlink-vwap-contract-cre/scripts/demo-vtn.sh) | Create demo orders on Tenderly VTN in four settlement states |
+| [`scripts/simulate.sh`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/scripts/simulate.sh) | Run CRE simulate with a custom payload |
+| [`scripts/simulate-and-forward.sh`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/scripts/simulate-and-forward.sh) | Simulate + submit rawReport on-chain via MockKeystoneForwarder |
+| [`scripts/demo-vtn.sh`](https://github.com/pelith/chainlink-vwap-contract-cre/blob/main/scripts/demo-vtn.sh) | Create demo orders on Tenderly VTN in four settlement states |
 
 ### MockForwarder vs Production CRE
 
